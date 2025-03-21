@@ -1,0 +1,42 @@
+QFrame#menuContainer {
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 10px;
+    padding: 20px;
+
+}
+
+QFrame#menuBox {
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 10px;
+    padding: 15px;
+}
+
+QPushButton {
+    padding: 10px;
+    font-weight: bold;
+    border: none;
+    border-radius: 5px;
+    text-align: center;
+    color: white;
+    font-size: 16px;
+    width: 300px;
+    margin: 2px;
+}
+
+QPushButton#clientButton {
+    background-color: #1E3A8A;
+    color: white;
+}
+
+QPushButton#clientButton:hover {
+    background-color: #182b5f;
+}
+
+QPushButton#dipendentiButton {
+    background-color: #C71585;
+    color: white;
+}
+
+QPushButton#dipendentiButton:hover {
+    background-color: #70124e;
+}

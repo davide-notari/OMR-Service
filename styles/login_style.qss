@@ -1,0 +1,57 @@
+QFrame#loginContainer {
+    background: rgba(255, 255, 255, 0.8);
+    padding: 20px;
+    border-radius: 10px;
+    width: 450px;
+    text-align: center;
+    color: black;
+}
+
+QLabel#logo {
+    max-width: 195px;
+    height: auto;
+    margin-bottom: 18px;
+}
+
+QFrame#loginBox {
+    background: rgba(255, 255, 255, 0.8);
+    padding: 20px;
+    border-radius: 10px;
+}
+
+QLabel#title {
+    font-size: 24px;
+    font-weight: bold;
+    color: #1E3A8A;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+QLineEdit {
+    border: 2px solid #1E3A8A;
+    background: rgba(255, 255, 255, 0.9);
+    color: black;
+    font-weight: bold;
+    border-radius: 5px;
+    padding: 7px;
+}
+
+QLineEdit:focus {
+    border-color: #C71585;
+    background: rgba(255, 255, 255, 1);
+}
+
+QPushButton#loginButton {
+    width: 100%;
+    padding: 10px;
+    background-color: #1E3A8A;
+    color: white;
+    font-weight: bold;
+    border: none;
+    border-radius: 5px;
+    margin-top: 10px;
+}
+
+QPushButton#loginButton:hover {
+    background-color: #142b66;
+}
