@@ -1,9 +1,9 @@
+icon.ico
+config.py
+db.py
+*.spec
 Admin/
 __pycache__/
 __final/
 build/
 dist/
-icon.ico
-config.py
-db.py
-*.spec
