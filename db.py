@@ -30,6 +30,16 @@ class Database:
             raise
 
 
+    def get_updates(self):
+        query = f"""
+            SELECT version, update_url
+            FROM app_updates
+            ORDER BY release_date DESC
+        """
+
+        self.cursor.execute(query)
+        return self.cursor.fetchone()
+
 
     def get_all(self, table_name):
         query = f"SELECT * FROM `{table_name}`"

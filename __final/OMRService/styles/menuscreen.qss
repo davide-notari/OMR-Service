@@ -40,3 +40,5 @@ QPushButton#dipendentiButton {
 QPushButton#dipendentiButton:hover {
     background-color: #70124e;
 }
+
+/*ciao*/

@@ -1,4 +1,4 @@
-import os, sys
+import os, sys, requests, zipfile, subprocess
 from datetime import (
     date
 )
@@ -15,6 +15,7 @@ from PyQt6.QtGui import (
     QLinearGradient, QBrush, QPalette, QPixmap, QColor, QPainter
 )
 from db import Database
+from config import APP_VERSION
 
 class GradientBackground(QWidget):
 
@@ -38,8 +39,9 @@ class MainApp(QWidget):
         
         self.stack = QStackedWidget()
         self.db = None
+        self.currentAppVersion = APP_VERSION
         
-        self.login_screen = LoginScreen(self.stack, self)
+        self.login_screen = LoginScreen(self.stack, self, self.currentAppVersion)
         self.stack.addWidget(self.login_screen)
         
         layout = QVBoxLayout()
@@ -62,6 +64,17 @@ class MainApp(QWidget):
             self.current_user = self.db.get_current_user()
             print(f"Utente attualmente connesso: {self.current_user}")
 
+            self.updatedInformation = self.db.get_updates()
+            self.updatedAppVersion = self.updatedInformation[0]
+            self.isAppUpdated = self.check_for_updates()
+
+            if(self.isAppUpdated is False):
+                QMessageBox.information(
+                    self,
+                    "Aggiornamento Disponibile",
+                    "Il programma deve essere aggiornato alla versione più recente.",
+                )
+                self.download_update()
 
             self.menu_screen = MenuScreen(self.stack, self.db, self.current_user)
             self.stack.addWidget(self.menu_screen)
@@ -72,15 +85,52 @@ class MainApp(QWidget):
             print(f"Errore di login: {e}")
             return False
         
+    def check_for_updates(self):
+        if str(self.currentAppVersion) == str(self.updatedAppVersion):
+            return True
+        else:
+            return False
+        
+    def download_update(self):
+        self.updateURL = str(self.updatedInformation[1])
+        self.updateFile = "OMRService.zip"
+
+        print("Scaricando l'aggiornamento...")
+        response = requests.get(self.updateURL, stream=True)
+        with open(self.updateFile, "wb") as file:
+            for chunk in response.iter_content(chunk_size=8192):
+                file.write(chunk)
+        print("Download completato!")
+        print("Avvio l'aggiornamento...")
+        subprocess.Popen(["updater.exe"], creationflags=subprocess.CREATE_NO_WINDOW)
+        sys.exit()
+
+    def extract_update(self):
+        self.updateFolder = "temp_update"
+        print("Estrazione dei file...")
+        with zipfile.ZipFile(self.updateFile, "r") as zip_ref:
+            zip_ref.extractall(self.updateFolder)
+        print("File estratti!")
+
+        for file_name in os.listdir(self.updateFolder):
+            src = os.path.join(self.updateFolder, file_name)
+            dest = os.path.join(os.getcwd(), file_name)
+            os.replace(src, dest)
+
+        print("Aggiornamento completato!")
+        
 
 class LoginScreen(GradientBackground):
-    def __init__(self, stack, main_app):
+    def __init__(self, stack, main_app, currentAppVersion):
         super().__init__()
 
         self.stack = stack
         self.main_app = main_app
         self.setObjectName("loginScreen")
         self.layout = QVBoxLayout()
+
+        spacer = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+        self.layout.addItem(spacer)
 
         self.container = QFrame()
         self.container.setObjectName("loginContainer")
@@ -112,16 +162,31 @@ class LoginScreen(GradientBackground):
         self.password_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
         login_layout.addWidget(self.password_input)
 
-        self.login_button = QPushButton("Entra")
+        self.login_button = QPushButton("Accedi")
         self.login_button.setObjectName("loginButton")
         self.login_button.clicked.connect(self.login)
         login_layout.addWidget(self.login_button)
 
-        self.login_box.setLayout(login_layout)
-        container_layout.addWidget(self.login_box, alignment=Qt.AlignmentFlag.AlignCenter)
-
         self.container.setLayout(container_layout)
         self.layout.addWidget(self.container, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        spacer = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+        self.layout.addItem(spacer)
+
+        version_frame = QFrame()
+        version_frame.setObjectName("versionFrame")
+        version_layout = QHBoxLayout(version_frame)
+        version_layout.setAlignment(Qt.AlignmentFlag.AlignRight)
+
+        self.version_label = QLabel(f"v {currentAppVersion}")
+        self.version_label.setObjectName("versionLabel")
+        self.version_label.setStyleSheet("color: black; font-size: 12px; margin-right: 10px;")
+        version_layout.addWidget(self.version_label)
+
+        self.login_box.setLayout(login_layout)
+        container_layout.addWidget(self.login_box, alignment=Qt.AlignmentFlag.AlignCenter)
+        
+        self.layout.addWidget(version_frame)
         self.setLayout(self.layout)
 
     def login(self):
