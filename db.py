@@ -130,7 +130,6 @@ class Database:
 
     
     def extract_enum_values(self, column_type):
-        # **Estrae i valori degli enum**
         return column_type.replace("enum(", "").replace(")", "").replace("'", "").split(",")
     
 

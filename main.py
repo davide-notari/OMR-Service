@@ -1205,7 +1205,6 @@ class DipendentiScreen(GradientBackground):
 
         self.dipendenti_layout.addLayout(self.filter_layout)
 
-        # **Tabella dipendenti**
         self.dipendenti_table = QTableWidget()
         self.dipendenti_table.setColumnCount(5)
         self.dipendenti_table.setHorizontalHeaderLabels(["ID", "Nome", "Cognome", "Email", "Data Inizio Contratto"])
@@ -1214,12 +1213,7 @@ class DipendentiScreen(GradientBackground):
         self.dipendenti_table.cellClicked.connect(self.show_dipendente_details)
         self.dipendenti_layout.addWidget(self.dipendenti_table)
 
-        # **Pulsanti Mostra tutti e Aggiungi Dipendente**
         self.button_layout = QHBoxLayout()
-
-        #self.show_all_button = QPushButton("Mostra tutti i dipendenti")
-        #self.show_all_button.clicked.connect(self.toggle_all_dipendenti)
-        #self.button_layout.addWidget(self.show_all_button)
 
         self.add_dipendente_button = QPushButton("Aggiungi Dipendente")
         self.add_dipendente_button.setObjectName("addDipendenteButton")
@@ -1257,18 +1251,6 @@ class DipendentiScreen(GradientBackground):
             if query in name:
                 self.add_dipendente_to_table(dipendente)
 
-    #def toggle_all_dipendenti(self):
-    #    if self.showing_all:
-    #        self.dipendenti_table.setRowCount(0)
-    #        self.showing_all = False
-    #        self.show_all_button.setText("Mostra tutti i dipendenti")
-    #    else:
-    #        self.dipendenti_table.setRowCount(0)
-    #        for dipendente in self.all_dipendenti:
-    #            self.add_dipendente_to_table(dipendente)
-
-    #        self.showing_all = True
-    #        self.show_all_button.setText("Nascondi tutti i dipendenti")
 
     def add_dipendente_to_table(self, dipendente):
         row_position = self.dipendenti_table.rowCount()

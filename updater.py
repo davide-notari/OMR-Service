@@ -23,7 +23,6 @@ def close_app():
             return
         time.sleep(1)
 
-    print(f"Attenzione: {APP_NAME} potrebbe essere ancora in esecuzione!")
 
 
 def force_delete_readonly(path):
@@ -38,7 +37,7 @@ def extract_update():
     print("Estrazione dei file...")
     with zipfile.ZipFile(UPDATE_FILE, "r") as zip_ref:
         zip_ref.extractall(UPDATE_FOLDER)
-    print("File estratti!")
+    print("File estratti")
 
 
 def replace_files():
@@ -50,7 +49,7 @@ def replace_files():
             try:
                 os.remove(dest)
             except PermissionError:
-                print(f"Permessi negati per {dest}, provo a modificarli...")
+                print(f"Permessi negati per {dest}")
                 os.chmod(dest, stat.S_IWRITE)
                 os.remove(dest)
 
