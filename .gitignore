@@ -1,9 +1,10 @@
-icon.ico
+todolist.txt
 config.py
-db.py
 *.spec
+*.ico
 Admin/
 __pycache__/
-__final/
+_final/
+_public/
 build/
 dist/

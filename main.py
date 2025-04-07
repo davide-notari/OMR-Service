@@ -2,6 +2,7 @@ import os, sys, requests, zipfile, subprocess
 from datetime import (
     date
 )
+from PyQt6.QtPrintSupport import QPrinter, QPrintDialog
 from PyQt6.QtCore import (
     QDate, Qt, QSize
 )
@@ -12,7 +13,7 @@ from PyQt6.QtWidgets import (
     QDateEdit, QComboBox, QSpinBox, QDoubleSpinBox, QHeaderView, QSpacerItem, QSizePolicy
 )
 from PyQt6.QtGui import (
-    QLinearGradient, QBrush, QPalette, QPixmap, QColor, QPainter
+    QLinearGradient, QBrush, QPalette, QPixmap, QColor, QPainter, QTextDocument
 )
 from db import Database
 from config import APP_VERSION
@@ -327,7 +328,7 @@ class ClientScreen(GradientBackground):
         self.client_table = QTableWidget()
         self.client_table.setObjectName("clientTable")
         self.client_table.setColumnCount(5)
-        self.client_table.setHorizontalHeaderLabels(["ID", "Denominazione", "Codice Fiscale", "Email", "Data Inizio Contratto"])
+        self.client_table.setHorizontalHeaderLabels(["ID", "Denominazione", "Codice Fiscale", "Ultima Fattura", "Note"])
         self.client_table.horizontalHeader().setStretchLastSection(False)
         self.client_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.client_table.cellClicked.connect(self.show_client_details)
@@ -378,9 +379,11 @@ class ClientScreen(GradientBackground):
 
         self.client_table.setItem(row_position, 0, QTableWidgetItem(str(client[0])))
         self.client_table.setItem(row_position, 1, QTableWidgetItem(client[1]))
-        self.client_table.setItem(row_position, 2, QTableWidgetItem(client[5]))
-        self.client_table.setItem(row_position, 3, QTableWidgetItem(client[10]))
-        self.client_table.setItem(row_position, 4, QTableWidgetItem(str(client[13])))
+        self.client_table.setItem(row_position, 2, QTableWidgetItem(client[6]))
+        self.neededclient = "Id_cliente_fisso" if self.current_table == "clienti_fissi" else "Id_cliente_occasionale"
+        self.client_table.setItem(row_position, 3, QTableWidgetItem(self.db.get_invoices(client[0], self.neededclient)))
+        self.clientnote = 20 if self.current_table == "clienti_fissi" else 18
+        self.client_table.setItem(row_position, 4, QTableWidgetItem(str(client[self.clientnote])))
 
     def show_client_details(self, row, column):
         client_id = int(self.client_table.item(row, 0).text())
@@ -551,6 +554,11 @@ class ClientDetailsWindow(GradientBackground):
         self.delete_button.clicked.connect(self.confirm_delete)
         self.button_layout.addWidget(self.delete_button)
 
+        self.print_button = QPushButton("Stampa")
+        self.print_button.setObjectName("printButton")
+        self.print_button.clicked.connect(self.print_client_data)
+        self.button_layout.addWidget(self.print_button)
+
         self.details_layout.addLayout(self.button_layout)
         self.layout.addWidget(self.details_container)
         self.setLayout(self.layout)
@@ -638,6 +646,23 @@ class ClientDetailsWindow(GradientBackground):
         self.invoice_value.setText(self.invoice_number)
         
         self.update()
+
+    def print_client_data(self):
+        printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+        dialog = QPrintDialog(printer, self)
+        
+        if dialog.exec() == QPrintDialog.DialogCode.Accepted:
+            html = "<h2>Dettagli Cliente</h2><hr><ul>"
+            for field, value in zip(self.field_names, self.client_data):
+                if field in ["Ultima_fattura", "Fattura"]:
+                    continue
+                html += f"<li><b>{field}:</b> {value}</li>"
+            html += f"<li><b>{'Ultima Fattura' if self.current_table == 'clienti_fissi' else 'Fattura'}:</b> {self.invoice_number}</li>"
+            html += "</ul>"
+
+            document = QTextDocument()
+            document.setHtml(html)
+            document.print(printer)
 
 
 class EditClientDialog(QDialog):
@@ -1152,7 +1177,7 @@ class DipendentiScreen(GradientBackground):
         self.menu_screen = menu_screen
         self.db = db
 
-        self.current_table = "Fisso"
+        self.current_table = "Indeterminato"
 
         with open("styles/visualizationScreen.qss", "r") as f:
             self.setStyleSheet(f.read())
@@ -1184,15 +1209,15 @@ class DipendentiScreen(GradientBackground):
 
         self.filter_layout = QHBoxLayout()
 
-        self.fixed_button = QPushButton("Fissi")
+        self.fixed_button = QPushButton("Indeterminati")
         self.fixed_button.setObjectName("fixedButton")
         self.fixed_button.setCheckable(True)
-        self.fixed_button.clicked.connect(lambda: self.change_table("Fisso"))
+        self.fixed_button.clicked.connect(lambda: self.change_table("Indeterminato"))
 
-        self.temporary_button = QPushButton("Stagionali")
+        self.temporary_button = QPushButton("Determinati")
         self.temporary_button.setObjectName("temporaryButton")
         self.temporary_button.setCheckable(True)
-        self.temporary_button.clicked.connect(lambda: self.change_table("Stagionale"))
+        self.temporary_button.clicked.connect(lambda: self.change_table("Determinato"))
 
         self.outsourcing_button = QPushButton("Outsourcing")
         self.outsourcing_button.setObjectName("outsourcingButton")
@@ -1231,8 +1256,8 @@ class DipendentiScreen(GradientBackground):
 
     def change_table(self, table_name):
         self.current_table = table_name
-        self.fixed_button.setChecked(table_name == "Fisso")
-        self.temporary_button.setChecked(table_name == "Stagionale")
+        self.fixed_button.setChecked(table_name == "Indeterminato")
+        self.temporary_button.setChecked(table_name == "Determinato")
         self.outsourcing_button.setChecked(table_name == "Outsourcing")
         self.load_dipendenti()
         self.update_dipendenti()
@@ -1256,10 +1281,10 @@ class DipendentiScreen(GradientBackground):
         row_position = self.dipendenti_table.rowCount()
         self.dipendenti_table.insertRow(row_position)
 
-        self.dipendenti_table.setItem(row_position, 0, QTableWidgetItem(str(dipendente[0])))  # ID
-        self.dipendenti_table.setItem(row_position, 1, QTableWidgetItem(dipendente[1]))  # Nome
-        self.dipendenti_table.setItem(row_position, 2, QTableWidgetItem(dipendente[2]))  # Cognome
-        self.dipendenti_table.setItem(row_position, 3, QTableWidgetItem(dipendente[6]))  # Email
+        self.dipendenti_table.setItem(row_position, 0, QTableWidgetItem(str(dipendente[0])))
+        self.dipendenti_table.setItem(row_position, 1, QTableWidgetItem(dipendente[1]))
+        self.dipendenti_table.setItem(row_position, 2, QTableWidgetItem(dipendente[2]))
+        self.dipendenti_table.setItem(row_position, 3, QTableWidgetItem(dipendente[6]))
         self.dipendenti_table.setItem(row_position, 4, QTableWidgetItem(str(dipendente[13])))
 
     def show_dipendente_details(self, row, column):
@@ -1304,6 +1329,8 @@ class AddDipendenteDialog(QDialog):
         for idx, (field_name, field_type, enum_values, max_length) in enumerate(self.fields_info):
             if(field_name == "Nome_fornitore") and (self.current_table != "Outsourcing"):
                 continue
+            if(field_name == "Data_fine_contratto") and (self.current_table not in ["Determinato", "Outsourcing"]):
+                continue
             elif(field_name == "Tipologia_contratto"):
                 widget = QComboBox()
                 widget.addItem(self.current_table)
@@ -1325,7 +1352,7 @@ class AddDipendenteDialog(QDialog):
                 widget = QLineEdit()
                 if max_length:
                     widget.setMaxLength(max_length)
-                    if(max_length < 255):
+                    if(max_length <= 255):
                         widget.setPlaceholderText(f"Massimo {max_length} caratteri")
 
             label_name = QLabel(f"{field_name}:")
@@ -1334,12 +1361,11 @@ class AddDipendenteDialog(QDialog):
             row_layout.addItem(QSpacerItem(100, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
             self.input_fields[field_name] = widget
 
-            if (idx + 1) % 2 == 0:
+            if row_layout.count() == 6:
                 form_layout.addRow(row_layout)
                 row_layout = QHBoxLayout()
 
-        if len(self.fields_info) % 2 != 0:
-            form_layout.addRow(row_layout)
+        form_layout.addRow(row_layout)
 
         main_layout.addLayout(form_layout)
 
@@ -1365,6 +1391,9 @@ class AddDipendenteDialog(QDialog):
         new_dipendente_data = {}
         for field_name, field_type, _, _ in self.fields_info:
             if(field_name == "Nome_fornitore") and (self.current_table != "Outsourcing"):
+                new_dipendente_data[field_name] = None
+                continue
+            if(field_name == "Data_fine_contratto") and (self.current_table != "Determinato"):
                 new_dipendente_data[field_name] = None
                 continue
             widget = self.input_fields[field_name]
@@ -1449,6 +1478,9 @@ class DipendenteDetailsWindow(GradientBackground):
 
         for idx, (field, value) in enumerate(zip(self.field_names, self.dipendente_data)):
             if (field == "Nome_fornitore") and (self.current_table != "Outsourcing"):
+                continue
+
+            if (field == "Data_fine_contratto") and (self.current_table != "Indeterminato"):
                 continue
 
             label_name = QLabel(f"<b>{field}:</b>")
