@@ -279,6 +279,8 @@ class ClientScreen(GradientBackground):
         self.menu_screen = menu_screen
         self.db = db
         self.current_table = None
+        self.neededclient = None
+        self.clientnote = None
 
         with open("styles/visualizationScreen.qss", "r") as f:
             self.setStyleSheet(f.read())
@@ -354,6 +356,10 @@ class ClientScreen(GradientBackground):
         self.current_table = table_name
         self.fixed_button.setChecked(table_name == "clienti_fissi")
         self.temporary_button.setChecked(table_name == "clienti_occasionali")
+
+        self.neededclient = "Id_cliente_fisso" if self.current_table == "clienti_fissi" else "Id_cliente_occasionale"
+        self.clientnote = 21 if self.current_table == "clienti_fissi" else 18
+
         self.load_clients()
         self.update_clients()
 
@@ -367,7 +373,7 @@ class ClientScreen(GradientBackground):
         self.client_table.setRowCount(0)
 
         for client in self.all_clients:
-            name = f"{client[1]} {client[5]} {client[10]} {client[13]}"
+            name = f"{client[1]} {client[6]} {self.db.get_invoices(client[0], self.neededclient)} {client[self.clientnote]}"
 
             if not query or query in name.lower():
                 self.add_client_to_table(client)
@@ -380,9 +386,7 @@ class ClientScreen(GradientBackground):
         self.client_table.setItem(row_position, 0, QTableWidgetItem(str(client[0])))
         self.client_table.setItem(row_position, 1, QTableWidgetItem(client[1]))
         self.client_table.setItem(row_position, 2, QTableWidgetItem(client[6]))
-        self.neededclient = "Id_cliente_fisso" if self.current_table == "clienti_fissi" else "Id_cliente_occasionale"
         self.client_table.setItem(row_position, 3, QTableWidgetItem(self.db.get_invoices(client[0], self.neededclient)))
-        self.clientnote = 20 if self.current_table == "clienti_fissi" else 18
         self.client_table.setItem(row_position, 4, QTableWidgetItem(str(client[self.clientnote])))
 
     def show_client_details(self, row, column):
@@ -556,7 +560,7 @@ class ClientDetailsWindow(GradientBackground):
 
         self.print_button = QPushButton("Stampa")
         self.print_button.setObjectName("printButton")
-        self.print_button.clicked.connect(self.print_client_data)
+        self.print_button.clicked.connect(self.print_data)
         self.button_layout.addWidget(self.print_button)
 
         self.details_layout.addLayout(self.button_layout)
@@ -647,7 +651,7 @@ class ClientDetailsWindow(GradientBackground):
         
         self.update()
 
-    def print_client_data(self):
+    def print_data(self):
         printer = QPrinter(QPrinter.PrinterMode.HighResolution)
         dialog = QPrintDialog(printer, self)
         
@@ -1019,6 +1023,11 @@ class InvoiceDetailsWindow(GradientBackground):
         self.delete_button.clicked.connect(self.delete_invoice)
         self.button_layout.addWidget(self.delete_button)
 
+        self.print_button = QPushButton("Stampa")
+        self.print_button.setObjectName("printButton")
+        self.print_button.clicked.connect(self.print_data)
+        self.button_layout.addWidget(self.print_button)
+
         self.details_layout.addLayout(self.button_layout)
         self.layout.addWidget(self.details_container)
         self.setLayout(self.layout)
@@ -1056,6 +1065,23 @@ class InvoiceDetailsWindow(GradientBackground):
             self.parent.all_invoices = self.db.get_invoices_list(self.parent.client_id, self.parent.client_type)
             self.parent.update_invoices()
             self.close()
+
+    def print_data(self):
+        printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+        dialog = QPrintDialog(printer, self)
+        
+        if dialog.exec() == QPrintDialog.DialogCode.Accepted:
+            html = "<h2>Dettagli Cliente</h2><hr><ul>"
+            for field, value in zip(self.field_names, self.client_data):
+                if field in ["Ultima_fattura", "Fattura"]:
+                    continue
+                html += f"<li><b>{field}:</b> {value}</li>"
+            html += f"<li><b>{'Ultima Fattura' if self.current_table == 'clienti_fissi' else 'Fattura'}:</b> {self.invoice_number}</li>"
+            html += "</ul>"
+
+            document = QTextDocument()
+            document.setHtml(html)
+            document.print(printer)
 
 
 class EditInvoiceDialog(QDialog):
@@ -1466,6 +1492,11 @@ class DipendenteDetailsWindow(GradientBackground):
         self.delete_button.clicked.connect(self.confirm_delete)
         self.button_layout.addWidget(self.delete_button)
 
+        self.print_button = QPushButton("Stampa")
+        self.print_button.setObjectName("printButton")
+        self.print_button.clicked.connect(self.print_data)
+        self.button_layout.addWidget(self.print_button)
+
         self.details_layout.addLayout(self.button_layout)
         self.layout.addWidget(self.details_container)
         self.setLayout(self.layout)
@@ -1512,6 +1543,23 @@ class DipendenteDetailsWindow(GradientBackground):
             self.parent.load_dipendenti()
             self.parent.update_dipendenti()
             self.close()
+
+    def print_data(self):
+        printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+        dialog = QPrintDialog(printer, self)
+        
+        if dialog.exec() == QPrintDialog.DialogCode.Accepted:
+            html = "<h2>Dettagli Cliente</h2><hr><ul>"
+            for field, value in zip(self.field_names, self.client_data):
+                if field in ["Ultima_fattura", "Fattura"]:
+                    continue
+                html += f"<li><b>{field}:</b> {value}</li>"
+            html += f"<li><b>{'Ultima Fattura' if self.current_table == 'clienti_fissi' else 'Fattura'}:</b> {self.invoice_number}</li>"
+            html += "</ul>"
+
+            document = QTextDocument()
+            document.setHtml(html)
+            document.print(printer)
 
 
 class EditDipendenteDialog(QDialog):
