@@ -1,4 +1,4 @@
-todolist.txt
+*.txt
 config.py
 *.spec
 *.ico

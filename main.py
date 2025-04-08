@@ -1072,7 +1072,7 @@ class InvoiceDetailsWindow(GradientBackground):
         
         if dialog.exec() == QPrintDialog.DialogCode.Accepted:
             html = "<h2>Dettagli Cliente</h2><hr><ul>"
-            for field, value in zip(self.field_names, self.client_data):
+            for field, value in zip(self.field_names, self.invoice_data):
                 if field in ["Ultima_fattura", "Fattura"]:
                     continue
                 html += f"<li><b>{field}:</b> {value}</li>"
@@ -1550,7 +1550,7 @@ class DipendenteDetailsWindow(GradientBackground):
         
         if dialog.exec() == QPrintDialog.DialogCode.Accepted:
             html = "<h2>Dettagli Cliente</h2><hr><ul>"
-            for field, value in zip(self.field_names, self.client_data):
+            for field, value in zip(self.field_names, self.dipendente_data):
                 if field in ["Ultima_fattura", "Fattura"]:
                     continue
                 html += f"<li><b>{field}:</b> {value}</li>"
