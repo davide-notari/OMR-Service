@@ -42,7 +42,24 @@ class Database:
 
 
     def get_all(self, table_name):
-        query = f"SELECT * FROM `{table_name}`"
+
+        if table_name in ["clienti_fissi", "clienti_occasionali"]:
+            client_id = "Id_cliente_fisso" if table_name == "clienti_fissi" else "Id_cliente_occasionale"
+
+            query = f"""
+                SELECT {table_name}.*, fatture.Numero_fattura AS UltimaFattura
+                FROM `{table_name}`
+                LEFT JOIN fatture ON {table_name}.Id_cliente = fatture.{client_id} AND fatture.Data_fattura = (
+                    SELECT MAX(Data_fattura)
+                    FROM fatture
+                    WHERE {client_id} = {table_name}.Id_cliente
+                )
+            """
+
+        else:
+            query = f"SELECT * FROM `{table_name}`"
+
+
         self.cursor.execute(query)
         return self.cursor.fetchall()
 
@@ -95,10 +112,13 @@ class Database:
         try:
             self.cursor.execute(sql, values)
             self.conn.commit()
-            print(f"Record aggiunto con successo nella tabella {table_name}.")
+            last_id = self.cursor.lastrowid
+            print(f"Record aggiunto con successo nella tabella {table_name}, ID: {last_id}")
+            return last_id
         except pymysql.MySQLError as e:
             print(f"Errore durante l'inserimento in {table_name}: {e}")
             self.conn.rollback()
+            return None
 
 
 

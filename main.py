@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QPushButton, QLineEdit, 
     QTableWidget, QTableWidgetItem, QStackedWidget, QLabel, QFrame,
     QScrollArea, QFormLayout, QHBoxLayout, QDialog, QDialogButtonBox, QMessageBox,
-    QDateEdit, QComboBox, QSpinBox, QDoubleSpinBox, QHeaderView, QSpacerItem, QSizePolicy
+    QDateEdit, QComboBox, QSpinBox, QDoubleSpinBox, QHeaderView, QSpacerItem, QSizePolicy, QGroupBox, QTextEdit
 )
 from PyQt6.QtGui import (
     QLinearGradient, QBrush, QPalette, QPixmap, QColor, QPainter, QTextDocument
@@ -373,7 +373,7 @@ class ClientScreen(GradientBackground):
         self.client_table.setRowCount(0)
 
         for client in self.all_clients:
-            name = f"{client[1]} {client[6]} {self.db.get_invoices(client[0], self.neededclient)} {client[self.clientnote]}"
+            name = f"{client[1]} {client[6]} {client[-1]} {client[self.clientnote]}"
 
             if not query or query in name.lower():
                 self.add_client_to_table(client)
@@ -386,7 +386,8 @@ class ClientScreen(GradientBackground):
         self.client_table.setItem(row_position, 0, QTableWidgetItem(str(client[0])))
         self.client_table.setItem(row_position, 1, QTableWidgetItem(client[1]))
         self.client_table.setItem(row_position, 2, QTableWidgetItem(client[6]))
-        self.client_table.setItem(row_position, 3, QTableWidgetItem(self.db.get_invoices(client[0], self.neededclient)))
+        ultima_fattura = client[-1] if client[-1] else "Nessuna"
+        self.client_table.setItem(row_position, 3, QTableWidgetItem(str(ultima_fattura)))
         self.client_table.setItem(row_position, 4, QTableWidgetItem(str(client[self.clientnote])))
 
     def show_client_details(self, row, column):
@@ -491,14 +492,33 @@ class AddClientDialog(QDialog):
             widget = self.input_fields[field_name]
             if isinstance(widget, QDateEdit):
                 new_client_data[field_name] = widget.date().toString("yyyy-MM-dd")
-            elif isinstance(widget, QSpinBox) or isinstance(widget, QDoubleSpinBox) or isinstance(widget, QComboBox):
-                new_client_data[field_name] = widget.currentText() if isinstance(widget, QComboBox) else widget.value()
+            elif isinstance(widget, (QSpinBox, QDoubleSpinBox)):
+                new_client_data[field_name] = widget.value()
+            elif isinstance(widget, QComboBox):
+                new_client_data[field_name] = widget.currentText()
             else:
                 new_client_data[field_name] = widget.text()
 
-        self.db.add_record(self.current_table, new_client_data, "Id_cliente")
+        new_client_id = self.db.add_record(self.current_table, new_client_data, "Id_cliente")
         self.parent.all_clients = self.db.get_all(self.current_table)
         self.parent.update_clients()
+
+        reply = QMessageBox.question(
+            self,
+            "Aggiungi Fattura",
+            "Cliente aggiunto con successo. Vuoi aggiungere subito una fattura?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            if self.current_table == "clienti_fissi":
+                client_type = "Id_cliente_fisso"
+            else:
+                client_type = "Id_cliente_occasionale"
+
+            invoice_dialog = AddInvoiceDialog(self.db, new_client_id, client_type, self.parent)
+            invoice_dialog.exec()
+
         self.accept()
 
     def paintEvent(self, event):
@@ -557,6 +577,11 @@ class ClientDetailsWindow(GradientBackground):
         self.delete_button.setObjectName("deleteButton")
         self.delete_button.clicked.connect(self.confirm_delete)
         self.button_layout.addWidget(self.delete_button)
+
+        self.duplicate_button = QPushButton("Duplica")
+        self.duplicate_button.setObjectName("duplicateButton")
+        self.duplicate_button.clicked.connect(self.duplicate_client)
+        self.button_layout.addWidget(self.duplicate_button)
 
         self.print_button = QPushButton("Stampa")
         self.print_button.setObjectName("printButton")
@@ -619,6 +644,7 @@ class ClientDetailsWindow(GradientBackground):
     def open_edit_dialog(self):
         self.edit_window = EditClientDialog(self.db, self.client_id, self.client_data, self.field_names, self.current_table, self.parent)
         self.edit_window.exec()
+        self.refresh_details()
 
     def confirm_delete(self):
         msg = QMessageBox()
@@ -639,7 +665,7 @@ class ClientDetailsWindow(GradientBackground):
         dialog.exec()
 
     def open_invoice_list(self):
-        self.invoice_window = InvoiceListWindow(self.db, self.client_id, self.neededclient)
+        self.invoice_window = InvoiceListWindow(self.db, self.client_id, self.neededclient, self)
         self.invoice_window.show()
 
     def update_invoice_info(self):
@@ -667,6 +693,41 @@ class ClientDetailsWindow(GradientBackground):
             document = QTextDocument()
             document.setHtml(html)
             document.print(printer)
+
+    def duplicate_client(self):
+        field_names_without_id = [field for field in self.field_names if field.lower() != "id_cliente"]
+        client_data_without_id = dict(zip(field_names_without_id, self.client_data[1:]))
+
+        print(field_names_without_id)
+        print("--------------------------------------")
+        print(client_data_without_id)
+
+        if "Denominazione" in client_data_without_id:
+            client_data_without_id["Denominazione"] += " (Copia)"
+
+        new_client_id = self.db.add_record(self.current_table, client_data_without_id, "Id_cliente")
+
+        if new_client_id:
+            QMessageBox.information(self, "Cliente duplicato", f"Cliente duplicato con ID: {new_client_id}")
+            self.parent.all_clients = self.db.get_all(self.current_table)
+            self.parent.update_clients()
+        else:
+            QMessageBox.warning(self, "Errore", "Si è verificato un errore durante la duplicazione.")
+
+    def refresh_details(self):
+        self.client_data, self.field_names = self.db.get_record_by_id(self.current_table, "Id_cliente", self.client_id)
+        for i in reversed(range(self.scroll_layout.count())):
+            item = self.scroll_layout.itemAt(i)
+            if item.widget():
+                item.widget().deleteLater()
+            elif item.layout():
+                while item.layout().count():
+                    child = item.layout().takeAt(0)
+                    if child.widget():
+                        child.widget().deleteLater()
+                self.scroll_layout.removeItem(item)
+
+        self.create_client_details()
 
 
 class EditClientDialog(QDialog):
@@ -895,7 +956,8 @@ class AddInvoiceDialog(QDialog):
 
         self.db.add_record("fatture", new_invoice_data, "")
         self.accept()
-        self.parent.update_invoice_info()
+        if isinstance(self.parent, ClientDetailsWindow):
+            self.parent.update_invoice_info()
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -906,13 +968,14 @@ class AddInvoiceDialog(QDialog):
 
 
 class InvoiceListWindow(GradientBackground):
-    def __init__(self, db, client_id, client_type):
+    def __init__(self, db, client_id, client_type, client_details_window=None):
         super().__init__()
         self.setWindowTitle("Fatture del Cliente")
         self.setGeometry(300, 200, 500, 400)
         self.db = db
         self.client_id = client_id
         self.client_type = client_type
+        self.client_details_window = client_details_window
 
         with open("styles/invoicesscreen.qss", "r") as f:
             self.setStyleSheet(f.read())
@@ -971,18 +1034,19 @@ class InvoiceListWindow(GradientBackground):
         invoice_data, field_names = self.db.get_record_by_id("fatture", "Numero_fattura", invoice_number)
 
         if invoice_data:
-            self.details_window = InvoiceDetailsWindow(invoice_data, field_names, self.db, self)
+            self.details_window = InvoiceDetailsWindow(invoice_data, field_names, self.db, self, self.client_details_window)
             self.details_window.show()
 
 
 class InvoiceDetailsWindow(GradientBackground):
-    def __init__(self, invoice_data, field_names, db, parent):
+    def __init__(self, invoice_data, field_names, db, parent, client_details_window=None):
         super().__init__()
         self.setWindowTitle("Dettagli Fattura")
         self.setGeometry(350, 250, 500, 400)
 
         self.db = db
         self.parent = parent
+        self.client_details_window = client_details_window
         self.invoice_number = invoice_data[0]
         self.field_names = field_names
         self.invoice_data = invoice_data
@@ -1049,8 +1113,19 @@ class InvoiceDetailsWindow(GradientBackground):
             self.scroll_layout.addLayout(column_layout)
 
     def edit_invoice(self):
-        self.edit_window = EditInvoiceDialog(self.db, self.invoice_number, self.invoice_data, self.field_names, self.parent.client_id, self.parent.client_type, self.parent)
+        self.edit_window = EditInvoiceDialog(
+            self.db,
+            self.invoice_number,
+            self.invoice_data,
+            self.field_names,
+            self.parent.client_id,
+            self.parent.client_type,
+            self.parent,
+            self.client_details_window,
+            self,
+        )
         self.edit_window.exec()
+        self.refresh_details()
 
     def delete_invoice(self):
         msg = QMessageBox()
@@ -1064,6 +1139,8 @@ class InvoiceDetailsWindow(GradientBackground):
             self.db.delete_record("fatture", "Numero_fattura", self.invoice_number)
             self.parent.all_invoices = self.db.get_invoices_list(self.parent.client_id, self.parent.client_type)
             self.parent.update_invoices()
+            if self.client_details_window:
+                self.client_details_window.update_invoice_info()
             self.close()
 
     def print_data(self):
@@ -1083,9 +1160,27 @@ class InvoiceDetailsWindow(GradientBackground):
             document.setHtml(html)
             document.print(printer)
 
+    def refresh_details(self):
+        self.invoice_data, self.field_names = self.db.get_record_by_id("fatture", "Numero_fattura", self.invoice_number)
+        for i in reversed(range(self.scroll_layout.count())):
+            item = self.scroll_layout.itemAt(i)
+            if item.widget():
+                item.widget().deleteLater()
+            elif item.layout():
+                while item.layout().count():
+                    child = item.layout().takeAt(0)
+                    if child.widget():
+                        child.widget().deleteLater()
+                self.scroll_layout.removeItem(item)
+
+        self.create_invoice_details()
+
+    def set_new_invoice_number(self, new_invoice_number):
+        self.invoice_number = new_invoice_number
+
 
 class EditInvoiceDialog(QDialog):
-    def __init__(self, db, invoice_number, invoice_data, field_names, client_id, client_type, parent):
+    def __init__(self, db, invoice_number, invoice_data, field_names, client_id, client_type, parent, client_details_window=None, invoice_details_window=None):
         super().__init__(parent)
         self.setWindowTitle("Modifica Fattura")
         self.setGeometry(300, 300, 400, 300)
@@ -1095,6 +1190,8 @@ class EditInvoiceDialog(QDialog):
         self.client_id = client_id
         self.client_type = client_type
         self.parent = parent
+        self.client_details_window = client_details_window
+        self.invoice_details_window = invoice_details_window
         self.layout = QVBoxLayout()
 
         with open("styles/add_edit.qss", "r") as f:
@@ -1184,6 +1281,11 @@ class EditInvoiceDialog(QDialog):
         self.db.update_record("fatture", "Numero_fattura", self.invoice_number, updated_data)
         self.parent.all_invoices = self.db.get_invoices_list(self.client_id, self.client_type)
         self.parent.update_invoices()
+        if(self.client_details_window):
+            self.client_details_window.update_invoice_info()
+        new_invoice_number = updated_data["Numero_fattura"]
+        self.invoice_details_window.set_new_invoice_number(new_invoice_number)
+        self.invoice_details_window.refresh_details()
         self.accept()
 
     def paintEvent(self, event):
@@ -1529,6 +1631,7 @@ class DipendenteDetailsWindow(GradientBackground):
     def open_edit_dialog(self):
         self.edit_window = EditDipendenteDialog(self.db, self.dipendente_id, self.dipendente_data, self.field_names, self.current_table, self.parent)
         self.edit_window.exec()
+        self.refresh_details()
 
     def confirm_delete(self):
         msg = QMessageBox()
@@ -1560,6 +1663,21 @@ class DipendenteDetailsWindow(GradientBackground):
             document = QTextDocument()
             document.setHtml(html)
             document.print(printer)
+
+    def refresh_details(self):
+        self.dipendente_data, self.field_names = self.db.get_record_by_id("dipendenti", "Id_dipendente", self.dipendente_id)
+        for i in reversed(range(self.scroll_layout.count())):
+            item = self.scroll_layout.itemAt(i)
+            if item.widget():
+                item.widget().deleteLater()
+            elif item.layout():
+                while item.layout().count():
+                    child = item.layout().takeAt(0)
+                    if child.widget():
+                        child.widget().deleteLater()
+                self.scroll_layout.removeItem(item)
+
+        self.create_dipendente_details()
 
 
 class EditDipendenteDialog(QDialog):
